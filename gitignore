@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+
+# Keep these on your computer only. Never upload them.
+private-questions.js
+users.json

@@ -1,19 +1,34 @@
 # AI-200 Practice
 
-A single-page practice site for the Microsoft AI-200 exam (Developing AI Cloud Solutions on Azure).
+A single-page practice site for the Microsoft AI-200 exam (Developing AI Cloud Solutions on Azure). Unofficial study aid, not affiliated with Microsoft.
 
-- Full timed practice exam (50 questions, 100 minutes, 70% pass mark) with mark-for-review and a question navigator
-- Exam questions are drawn in proportion to the AI-200 domain weights
-- Practice by topic, grouped under Containers, Data for AI, Using Azure services, and Security and monitoring
-- Five question formats: multiple choice, choose more than one, drag to order, drag to match, select from lists
-- Partial credit: each correct selection, step, match or list choice earns a point, as on the real exam
-- Case-study questions show an expandable case summary, and code questions show the code above the answers
-- Progress is based on your latest answer to each question, from both practice and full exams, and is saved in the browser (localStorage)
+- Timed exams in the style of the Microsoft exam screen: choose a length (10, 25, 50, 100 or all), or work through Exams 1–3 in order
+- Practice by topic or by question format, with explanations after every answer
+- Study page showing every question with its answer, plus search, filters and a hide-answers mode
+- Five question formats, partial credit, case studies and code exhibits
 
-This is an unofficial study aid and is not affiliated with Microsoft.
+## Access control
 
-## Run it
+The questions are encrypted in `questions.enc.js`. Visitors sign in with a username and password, and their browser decrypts the questions. Without a valid login the file can't be read, so it is safe to keep in this repo.
 
-Put `index.html` and `private-questions.js` in the same folder and open `index.html` in a browser. No build step or dependencies.
+## Managing users
 
-The questions live only in `private-questions.js`. Without it, the site shows a "No questions loaded" message. The file is listed in `.gitignore`, so it is not pushed to GitHub.
+You need Node.js. Keep these files in one folder on your computer:
+
+- `manage-users.js`
+- `private-questions.js` (the readable questions; never upload)
+- `users.json` (created by the script; holds usernames and passwords; never upload)
+
+Commands:
+
+```bash
+node manage-users.js add thabo "colleague"   # give access; prints the password to send them
+node manage-users.js remove thabo            # take access away
+node manage-users.js reset thabo             # new password for someone
+node manage-users.js list                    # who has access
+node manage-users.js build                   # re-encrypt after editing private-questions.js
+```
+
+After `add`, `remove`, `reset` or `build`, upload the new `questions.enc.js` to GitHub. Vercel redeploys automatically.
+
+Back up `users.json` somewhere safe. If you lose it, run `add` again for each person and send them new passwords.
