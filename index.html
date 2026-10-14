@@ -127,6 +127,21 @@ code { font-family: Consolas, "Cascadia Mono", ui-monospace, Menlo, monospace; f
 .chip { background: #fff; border: 1px solid var(--primary); color: var(--primary-dark); border-radius: 2px; padding: 6px 12px; font-weight: 600; cursor: grab; text-align: left; box-shadow: var(--shadow); }
 .chip.picked { background: var(--primary); color: #fff; }
 
+details.case { margin: 4px 0 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--subtle); padding: 10px 14px; }
+pre.code { background: var(--subtle); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; overflow-x: auto; font-family: Consolas, "Cascadia Mono", ui-monospace, Menlo, monospace; font-size: .86rem; line-height: 1.5; margin: 0 0 14px; white-space: pre; }
+.sel-rows { display: grid; gap: 10px; }
+.sel-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+.sel-row select { font: inherit; width: 100%; padding: 7px 8px; border: 1px solid #8a8886; border-radius: 2px; background: #fff; color: var(--ink); }
+.sel-row.correct { border-color: var(--good); background: var(--good-soft); }
+.sel-row.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.sel-row .fix { grid-column: 1 / -1; font-size: .88rem; color: var(--muted); }
+@media (max-width: 640px) { .sel-row { grid-template-columns: 1fr; } }
+details.case summary { cursor: pointer; font-weight: 600; }
+details.case p, details.case li { font-size: .93rem; color: var(--muted); margin: 8px 0 0; }
+details.case ul { padding-left: 20px; margin: 6px 0 0; }
+.bank { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 0; font-size: .92rem; color: var(--muted); }
+.bank button { border: 1px solid #8a8886; background: #fff; border-radius: 2px; padding: 5px 12px; }
+.bank button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
 .explain { margin-top: 16px; padding: 14px 16px; border-radius: 2px; background: var(--primary-soft); border-left: 4px solid var(--primary); }
 .explain > b { display: block; margin-bottom: 2px; }
 .explain.good { background: var(--good-soft); border-left-color: var(--good); }
@@ -188,274 +203,66 @@ code { font-family: Consolas, "Cascadia Mono", ui-monospace, Menlo, monospace; f
 <body>
 <header class="top"><div class="top-in"><button class="brand" id="brand" aria-label="Go to the start page"><span class="badge">AI-200</span><span>Practice tests</span></button><span class="disc">Unofficial practice site. Not affiliated with Microsoft.</span></div></header>
 <main id="app"></main>
+<script src="private-questions.js"></script>
 
 <script>
-/* All questions are original practice items written against the public AI-200 skills outline. */
-const M = (q, o, c, e) => ({ type: "multi", q, o, c, e });
-const O = (q, items, e) => ({ type: "order", q, items, e });
-const P = (q, pairs, extra, e) => ({ type: "match", q, pairs, extra: extra || [], e });
+/* Questions are loaded from private-questions.js. */
+const M = (id, q, o, c, e) => ({ id, type: "multi", q, o, c, e });
+const O = (id, q, items, e) => ({ id, type: "order", q, items, e });
+const P = (id, q, pairs, extra, e) => ({ id, type: "match", q, pairs, extra: extra || [], e });
 
 const FORMATS = {
   single: { name: "Multiple choice", blurb: "Pick the one best answer." },
   multi: { name: "Choose more than one", blurb: "Select every answer that applies." },
   order: { name: "Drag to order", blurb: "Put the steps in the right order." },
-  match: { name: "Drag to match", blurb: "Match each item with its partner." }
+  match: { name: "Drag to match", blurb: "Match each item with its partner." },
+  select: { name: "Select from lists", blurb: "Pick the right option in each row." }
 };
 
 const DOMAINS = [
 { name: "Containers", weight: "About 20–25% of the exam", note: "Building, storing and running container images on Azure.", topics: [
-  { id: "acr", title: "Container images and Azure Container Registry", blurb: "Building, pulling and distributing images.", qs: [
-    { q: "Your team has no Docker installed on their laptops, but they need to build an image and push it to Azure Container Registry. What should they use?",
-      o: ["<code>az acr build</code> (an ACR Tasks quick build)", "<code>az container create</code>", "<code>az acr import</code>", "Enable the admin user and run <code>docker push</code>"],
-      e: "ACR Tasks builds the image inside Azure from your source, so no local Docker daemon is needed. <code>az acr import</code> only copies an image that already exists." },
-    { q: "An AKS cluster must pull images from a private registry without anyone storing passwords. What is the best approach?",
-      o: ["Give the cluster's kubelet managed identity the <b>AcrPull</b> role on the registry", "Turn on the registry admin user and paste the password into a manifest", "Store a service principal secret in a ConfigMap", "Allow anonymous pull on the registry"],
-      e: "A managed identity with AcrPull needs no stored secret and follows least privilege." },
-    { q: "Your image is 1.4 GB because it ships compilers and build tools. Which technique shrinks it most directly?",
-      o: ["A multi-stage build that copies only the build output into a slim final image", "Add more <code>RUN</code> layers", "Tag the image <code>latest</code>", "Zip the source before copying it in"],
-      e: "Multi-stage builds leave the build tools behind in an earlier stage, so the final image only holds what the app needs at runtime." },
-    { q: "Users in Europe and Asia pull images slowly from a registry in the US. Which feature helps?",
-      o: ["Geo-replication (Premium tier)", "A larger storage quota", "Tag locking", "An ACR Task that runs hourly"],
-      e: "Geo-replication keeps copies of the registry near each region, so pulls are faster and more resilient." },
-    M("Which <b>two</b> actions help keep a registry tidy and reduce storage cost?",
-      ["Set a retention policy for untagged manifests (Premium tier)", "Run a scheduled ACR task that uses <code>acr purge</code> to remove old tags", "Turn on the admin user", "Add more geo-replicas"], [0, 1],
-      "Retention policies clean up untagged manifests, and <code>acr purge</code> in a scheduled task removes old tags. The admin user does nothing for storage, and extra replicas add more copies."),
-    O("Put the parts of a multi-stage Dockerfile in order.",
-      ["<code>FROM</code> the SDK image <code>AS build</code>", "<code>RUN</code> the publish command in that stage", "<code>FROM</code> the slim runtime image", "<code>COPY --from=build</code> the published output"],
-      "The build stage has to exist and produce output before the runtime stage can copy from it.")
-  ] },
-  { id: "aca", title: "Azure Container Apps", blurb: "Scaling, revisions, jobs and secrets.", qs: [
-    { q: "A web API on Azure Container Apps should add replicas when the number of concurrent requests rises. Which scale rule fits?",
-      o: ["An HTTP scale rule based on concurrent requests", "A cron scale rule", "A rule based on node disk size", "A storage queue length rule"],
-      e: "HTTP scale rules watch concurrent requests, which is exactly the signal an API needs." },
-    { q: "You want to send 10% of traffic to a new version and 90% to the current one. What do you set up?",
-      o: ["Multiple revision mode with traffic weights", "Single revision mode and two separate apps", "Session affinity", "A higher minimum replica count"],
-      e: "In multiple revision mode, several revisions stay active and you split traffic between them by percentage." },
-    { q: "A nightly report generator runs for 20 minutes and then exits. Which Container Apps resource fits best?",
-      o: ["A Container Apps job with a schedule trigger", "An app with external ingress and 10 minimum replicas", "An app with a Dapr sidecar", "An app with session affinity"],
-      e: "Jobs run to completion and stop, so you only pay while they run. A schedule trigger starts them on a cron expression." },
-    { q: "Your container needs a database password as an environment variable, without hardcoding it in the image. What should you do?",
-      o: ["Define a secret on the container app and reference it from the environment variable", "Add it with <code>ENV</code> in the Dockerfile", "Include it in the image tag", "Commit it in <code>appsettings.json</code>"],
-      e: "App secrets (or Key Vault references) keep sensitive values out of the image and the repository." },
-    M("Which <b>two</b> things let you roll back quickly after a bad release?",
-      ["Keep the previous revision active (multiple revision mode)", "Shift traffic weight back to the previous revision", "Delete the Container Apps environment", "Turn off ingress"], [0, 1],
-      "With the old revision still running, you only need to move the traffic weights back. Deleting the environment or turning off ingress just causes an outage."),
-    O("Roll out a new version to 10% of users. Put the steps in order.",
-      ["Switch the app to multiple revision mode", "Deploy the new revision", "Send 10% of traffic to the new revision", "After checks pass, move 100% of traffic to it"],
-      "Multiple revision mode comes first so the old revision stays alive. You only widen traffic after the small test looks healthy.")
-  ] },
-  { id: "aks", title: "AKS and troubleshooting pods", blurb: "Common pod errors and Kubernetes helpers.", qs: [
-    { q: "A pod shows <code>ImagePullBackOff</code>. What should you check first?",
-      o: ["The image name and tag, and whether the cluster can authenticate to the registry (<code>kubectl describe pod</code>)", "The Horizontal Pod Autoscaler", "The ingress certificate", "Node CPU quotas"],
-      e: "ImagePullBackOff means Kubernetes can't pull the image. A wrong name, a missing tag or missing registry permission are the usual causes." },
-    { q: "A container was terminated with exit code 137 and reason <code>OOMKilled</code>. What happened?",
-      o: ["It used more memory than its limit", "It failed its liveness probe", "The image couldn't be pulled", "The node was cordoned"],
-      e: "OOMKilled means the container went over its memory limit. Raise the limit or fix the memory use." },
-    { q: "Pods need secrets from Azure Key Vault mounted as files. Which AKS capability do you use?",
-      o: ["Azure Key Vault provider for the Secrets Store CSI Driver", "CoreDNS", "kube-proxy", "A ResourceQuota"],
-      e: "The Secrets Store CSI Driver, with the Key Vault provider, mounts secrets into pods without copying them into your manifests." },
-    { q: "You want pods to scale out automatically when average CPU rises. Which Kubernetes object do you create?",
-      o: ["HorizontalPodAutoscaler", "PodDisruptionBudget", "NetworkPolicy", "ResourceQuota"],
-      e: "The HorizontalPodAutoscaler adds or removes pod replicas based on metrics such as CPU." },
-    M("Your app must handle traffic spikes. Which <b>two</b> AKS features add capacity automatically?",
-      ["Horizontal Pod Autoscaler (more pods)", "Cluster autoscaler (more nodes)", "PodDisruptionBudget", "NetworkPolicy"], [0, 1],
-      "The Horizontal Pod Autoscaler adds pods, and the cluster autoscaler adds nodes when pods have nowhere to run."),
-    O("Troubleshoot a pod that won't start. Put the steps in order, from broad to specific.",
-      ["Run <code>kubectl get pods</code> to see the status", "Run <code>kubectl describe pod</code> to read the events", "Run <code>kubectl logs</code> to read the container output", "Fix the cause and redeploy"],
-      "Start with the overall status, then the events, then the container's own output, and only then change something."),
-    P("Match each pod status or reason with what it usually means.",
-      [["<code>ImagePullBackOff</code>", "The image can't be pulled (wrong name or registry access)"], ["<code>OOMKilled</code>", "The container went over its memory limit"], ["<code>CrashLoopBackOff</code>", "The container starts, exits, and is restarted over and over"]], [],
-      "Each status points to a different place to look: the image and registry, the memory limit, or the application's own logs.")
-  ] }
+  { id: "acr", title: "Container images and Azure Container Registry", blurb: "Building, pulling and distributing images.", qs: [] },
+  { id: "aca", title: "Azure Container Apps", blurb: "Scaling, revisions, jobs and secrets.", qs: [] },
+  { id: "aks", title: "AKS and troubleshooting pods", blurb: "Common pod errors and Kubernetes helpers.", qs: [] }
 ] },
 { name: "Data for AI", weight: "About 25–30% of the exam (the biggest area)", note: "Databases, vector search, caching and messaging for AI apps.", topics: [
-  { id: "cosmos", title: "Azure Cosmos DB for NoSQL", blurb: "Partition keys, point reads, vectors, change feed.", qs: [
-    { q: "A chat-history container holds messages for millions of users, and queries always filter by user. Which property makes the best partition key?",
-      o: ["<code>userId</code>", "<code>messageType</code> (five possible values)", "<code>isDeleted</code> (true or false)", "<code>country</code>"],
-      e: "A good partition key has many distinct values, spreads data evenly, and appears in your common queries. <code>userId</code> does all three." },
-    { q: "You know a document's <code>id</code> and partition key value. What is the cheapest way to read it?",
-      o: ["A point read", "A cross-partition <code>SELECT *</code> with a filter", "A stored procedure", "Reading the change feed"],
-      e: "A point read goes straight to the item and costs the fewest request units." },
-    { q: "Which function ranks documents by embedding similarity in a Cosmos DB for NoSQL query?",
-      o: ["<code>VectorDistance</code>", "<code>ST_DISTANCE</code>", "<code>ARRAY_CONTAINS</code>", "<code>CONTAINS</code>"],
-      e: "Use <code>ORDER BY VectorDistance(c.embedding, @queryVector)</code>. The container also needs a vector embedding policy and a vector index." },
-    { q: "You want to generate an embedding automatically every time a document is added or updated. Which feature should drive a function?",
-      o: ["The change feed", "Time to live (TTL)", "A unique key policy", "The consistency level"],
-      e: "The change feed lists inserts and updates in order, and Azure Functions can react to it with a Cosmos DB trigger." },
-    M("Which <b>two</b> things must be set up on a container before you can run vector similarity queries?",
-      ["A vector embedding policy", "A vector index in the indexing policy", "A unique key on the embedding path", "A TTL on every document"], [0, 1],
-      "The policy tells Cosmos DB the vector path, data type and dimensions, and the index makes similarity queries fast."),
-    O("Add vector search to an app. Put the steps in order.",
-      ["Define the vector embedding policy and vector index on the container", "Generate embeddings and store them in your documents", "Embed the user's question at query time", "Query with <code>VectorDistance</code> to get the closest matches"],
-      "The container has to be ready first, then data goes in, and finally you embed the question and search."),
-    P("Match each feature with the database it belongs to.",
-      [["<code>VectorDistance</code> in a query", "Azure Cosmos DB for NoSQL"], ["<code>&lt;=&gt;</code> cosine distance operator", "Azure Database for PostgreSQL (pgvector)"], ["<code>FT.CREATE</code> search index", "Azure Managed Redis"]], [],
-      "All three support vector search, but each exposes it in its own way.")
-  ] },
-  { id: "pg", title: "Azure Database for PostgreSQL", blurb: "pgvector, distance operators and indexes.", qs: [
-    { q: "Which PostgreSQL extension adds a vector column type and similarity search?",
-      o: ["pgvector (<code>vector</code>)", "PostGIS", "pg_cron", "pg_stat_statements"],
-      e: "pgvector adds the <code>vector</code> type and distance operators. On Azure you allow-list it first, then run <code>CREATE EXTENSION vector</code>." },
-    { q: "In pgvector, which operator returns cosine distance?",
-      o: ["<code>&lt;=&gt;</code>", "<code>&lt;-&gt;</code>", "<code>&lt;#&gt;</code>", "<code>||</code>"],
-      e: "<code>&lt;=&gt;</code> is cosine distance. <code>&lt;-&gt;</code> is Euclidean (L2) and <code>&lt;#&gt;</code> is negative inner product." },
-    { q: "Which index type gives strong recall for approximate nearest-neighbor search and doesn't depend on existing rows to pick cluster centers?",
-      o: ["HNSW", "IVFFlat", "B-tree", "GIN on a text column"],
-      e: "HNSW builds a graph as rows arrive. IVFFlat chooses its clusters from existing data, so it is best built after loading rows." },
-    { q: "You want to create embeddings from inside SQL by calling Azure OpenAI. Which extension helps?",
-      o: ["<code>azure_ai</code>", "<code>pgcrypto</code>", "<code>hstore</code>", "<code>postgres_fdw</code>"],
-      e: "The <code>azure_ai</code> extension lets you call Azure AI services, including embedding generation, from SQL." },
-    M("Which <b>two</b> steps enable pgvector on an Azure Database for PostgreSQL flexible server?",
-      ["Allow-list the <code>vector</code> extension in the server parameters", "Run <code>CREATE EXTENSION vector</code> in your database", "Install pgvector with the operating system package manager", "Upload an extension file through the portal"], [0, 1],
-      "Azure is a managed service, so you allow-list the extension on the server and then create it in the database. You can't install packages on the host."),
-    O("Set up similarity search in PostgreSQL. Put the steps in order.",
-      ["Allow-list and create the <code>vector</code> extension", "Create a table with a <code>vector</code> column", "Insert rows with their embeddings", "Create an HNSW index and query with <code>ORDER BY embedding &lt;=&gt; …</code>"],
-      "The extension must exist before the column type does, and you need a table and data before indexing and searching.")
-  ] },
-  { id: "redis", title: "Azure Managed Redis", blurb: "Semantic caching, TTL, vector indexes, Entra sign-in.", qs: [
-    { q: "Many users ask near-identical questions, and your LLM bill is climbing. What cuts the number of model calls?",
-      o: ["A semantic cache: store prompt embeddings and reuse answers for similar prompts", "Raise <code>max_tokens</code>", "Add more app replicas", "Lower the temperature"],
-      e: "A semantic cache finds earlier prompts that mean the same thing and returns the saved answer instead of calling the model again." },
-    { q: "Cached answers should expire after one hour. What do you set?",
-      o: ["A time to live (TTL) on each key", "Data persistence", "A larger SKU", "Cluster mode"],
-      e: "A TTL removes the key automatically after the time you choose, so stale answers don't linger." },
-    { q: "Which command defines a search index with a vector field over Redis hashes?",
-      o: ["<code>FT.CREATE</code>", "<code>HSET</code> alone", "<code>SUBSCRIBE</code>", "<code>XADD</code>"],
-      e: "<code>FT.CREATE</code> creates a search index. Add a <code>VECTOR</code> field to it to enable similarity search." },
-    { q: "You want your app to connect to Redis without access keys. What do you use?",
-      o: ["Microsoft Entra ID authentication", "A longer access key", "Turning TLS off", "A shared access signature (SAS)"],
-      e: "Entra ID authentication lets apps sign in with a managed identity instead of a shared secret." },
-    M("Which <b>two</b> settings keep a semantic cache accurate and fresh?",
-      ["A similarity threshold for what counts as a match", "A TTL on cached answers", "Storing every answer forever", "Matching on exact prompt text only"], [0, 1],
-      "The threshold decides how close a prompt must be to reuse an answer, and the TTL stops old answers from lingering."),
-    O("A prompt arrives and nothing similar is cached. Put the cache-miss steps in order.",
-      ["Turn the user's prompt into an embedding", "Search Redis for a similar cached prompt", "Call the model because nothing similar was found", "Save the new prompt embedding and answer with a TTL"],
-      "You need the embedding to search, you only call the model after a miss, and you save the result for next time.")
-  ] },
-  { id: "events", title: "Events and messages", blurb: "Event Grid, Service Bus and Event Hubs.", qs: [
-    { q: "You want a lightweight push notification when a blob is created in a storage account. Which service fits?",
-      o: ["Event Grid", "Event Hubs", "Azure Batch", "A Service Bus session"],
-      e: "Event Grid routes discrete events such as 'blob created' to handlers like Functions or webhooks." },
-    { q: "Messages for the same customer must be handled in order, while different customers are processed in parallel. What do you use?",
-      o: ["Service Bus sessions", "Many separate queues", "A higher prefetch count", "Event Grid retries"],
-      e: "Sessions group related messages (by session ID) so one receiver handles a group in order while others handle other groups." },
-    { q: "You need to take in millions of telemetry events per second for streaming analytics. Which service fits?",
-      o: ["Event Hubs", "A Service Bus queue", "A Storage queue", "An Event Grid custom topic"],
-      e: "Event Hubs is built for high-throughput event streaming." },
-    { q: "One message keeps failing and blocks other work. What stops it from retrying forever?",
-      o: ["Let it move to the dead-letter queue after the maximum delivery count", "Increase the lock duration without limit", "Delete the queue", "Disable the queue"],
-      e: "After the max delivery count, Service Bus moves the message to the dead-letter queue so you can inspect it later." },
-    M("Which <b>two</b> settings help make sure a Service Bus message isn't lost if the consumer crashes halfway?",
-      ["Use peek-lock receive mode", "Complete the message only after processing succeeds", "Use receive-and-delete mode", "Set the message to auto-delete when idle"], [0, 1],
-      "Peek-lock keeps the message until you complete it. If the consumer crashes first, the lock expires and the message is delivered again."),
-    P("Match each need with the best service.",
-      [["Notify a handler when a blob is created", "Event Grid"], ["Stream millions of telemetry events", "Event Hubs"], ["Process one customer's messages in order", "Service Bus"]], ["Azure Batch"],
-      "Event Grid reacts to events, Event Hubs streams large volumes, and Service Bus handles reliable, ordered messages.")
-  ] }
+  { id: "cosmos", title: "Azure Cosmos DB for NoSQL", blurb: "Partition keys, point reads, vectors, change feed.", qs: [] },
+  { id: "pg", title: "Azure Database for PostgreSQL", blurb: "pgvector, distance operators and indexes.", qs: [] },
+  { id: "redis", title: "Azure Managed Redis", blurb: "Semantic caching, TTL, vector indexes, Entra sign-in.", qs: [] },
+  { id: "events", title: "Events and messages", blurb: "Event Grid, Service Bus and Event Hubs.", qs: [] }
 ] },
 { name: "Using Azure services", weight: "Part of the data and integration areas", note: "Functions and calling AI services from your code.", topics: [
-  { id: "func", title: "Azure Functions", blurb: "Triggers, bindings, Durable Functions, cold starts.", qs: [
-    { q: "A function must run every six hours. Which trigger type do you use?",
-      o: ["Timer trigger", "HTTP trigger", "Blob trigger", "Queue trigger"],
-      e: "A timer trigger runs on a schedule you write as a cron-style expression." },
-    { q: "A function should save its result to Cosmos DB without you writing SDK code. What do you use?",
-      o: ["An output binding", "An input binding", "A custom trigger", "An app setting"],
-      e: "Output bindings write data to a service for you, so the function only returns or sets the value." },
-    { q: "A multi-step AI workflow (extract, embed, index) needs automatic checkpoints and retries. What fits best?",
-      o: ["Durable Functions with an orchestrator function", "One long HTTP-triggered function", "A timer trigger every minute", "Three unrelated functions"],
-      e: "Durable Functions orchestrations keep their state and resume after failures, which suits long, multi-step flows." },
-    { q: "Users notice delays when a function wakes up after being idle. What reduces those cold starts?",
-      o: ["Use a plan with pre-warmed or always-ready instances (such as Premium)", "Lower the function timeout", "Add a second timer trigger", "Increase the log level"],
-      e: "Always-ready or pre-warmed instances keep workers running so requests don't wait for a new one to start." },
-    M("Which <b>two</b> are benefits of using Functions bindings?",
-      ["Less connection boilerplate code", "Declarative links to services such as queues and Cosmos DB", "They remove the need for any permissions", "They guarantee every message is processed exactly once"], [0, 1],
-      "Bindings handle the plumbing for you. They don't remove the need for permissions, and delivery guarantees depend on the service."),
-    P("Match each scenario with the trigger.",
-      [["Run every night at 2 a.m.", "Timer trigger"], ["Run when a message arrives on a queue", "Service Bus trigger"], ["Run when a client calls a URL", "HTTP trigger"]], ["Blob trigger"],
-      "The trigger names the event that starts the function.")
-  ] },
-  { id: "ai", title: "Calling AI services from code", blurb: "Retries, keyless access, streaming, API Management.", qs: [
-    { q: "Your app gets HTTP 429 responses from Azure OpenAI during busy periods. What is the right fix in code?",
-      o: ["Retry with exponential backoff and respect the <code>Retry-After</code> header", "Retry immediately in a tight loop", "Ignore the error and return an empty answer", "Switch to a bigger prompt"],
-      e: "429 means you hit a rate limit. Backing off and honoring <code>Retry-After</code> lets the limit reset." },
-    { q: "An app running on Azure should call Azure OpenAI without any API key. What do you set up?",
-      o: ["A managed identity with a suitable role, using <code>DefaultAzureCredential</code>", "A key stored in the app code", "A key stored in a public repo", "An anonymous endpoint"],
-      e: "Managed identity plus a role such as Cognitive Services OpenAI User removes the key entirely." },
-    { q: "You want users to see the reply appear word by word instead of waiting for the full answer. What do you do?",
-      o: ["Turn on streaming (<code>stream=True</code>) and read the chunks", "Lower the temperature", "Increase <code>max_tokens</code>", "Cache the prompt"],
-      e: "Streaming returns the response in small chunks as they are generated, which makes the app feel faster." },
-    { q: "Several apps share one Azure OpenAI deployment, and you want per-team token limits. What helps?",
-      o: ["Azure API Management in front of the deployment, with a token limit policy", "A bigger virtual machine", "More Event Hubs partitions", "A longer system prompt"],
-      e: "API Management can sit in the middle and limit tokens per consumer before requests reach the model." },
-    M("Which <b>two</b> practices make calls to Azure OpenAI more resilient?",
-      ["Retries with exponential backoff", "Request timeouts, so a slow call can't hang your app", "Hardcoding the API key", "Turning off TLS to save time"], [0, 1],
-      "Backoff handles temporary errors, and timeouts keep one slow call from blocking everything else."),
-    P("Match each HTTP status from Azure OpenAI with its usual meaning.",
-      [["<code>401</code>", "Missing or invalid credentials"], ["<code>404</code>", "Deployment name or endpoint not found"], ["<code>429</code>", "Rate limit reached; slow down and retry"]], ["Request body was malformed"],
-      "A 401 is about who you are, a 404 is about what you asked for, and a 429 is about how often you ask.")
-  ] }
+  { id: "func", title: "Azure Functions", blurb: "Triggers, bindings, Durable Functions, cold starts.", qs: [] },
+  { id: "ai", title: "Calling AI services from code", blurb: "Retries, keyless access, streaming, API Management.", qs: [] }
 ] },
 { name: "Security and monitoring", weight: "About 20–25% of the exam", note: "Keeping solutions safe and finding out what went wrong.", topics: [
-  { id: "sec", title: "Securing Azure solutions", blurb: "Managed identities, Key Vault, RBAC, private networking.", qs: [
-    { q: "Three apps should share one identity when they call other Azure resources. What do you create?",
-      o: ["A user-assigned managed identity", "A system-assigned identity on each app", "A shared password", "A guest user account"],
-      e: "A user-assigned identity is a standalone resource that you can attach to several apps." },
-    { q: "An app only needs to read secrets from Key Vault. Which choice follows least privilege?",
-      o: ["Assign the <b>Key Vault Secrets User</b> role", "Assign Owner on the subscription", "Assign Contributor on the resource group", "Assign Key Vault Administrator"],
-      e: "Key Vault Secrets User can read secret values and nothing more." },
-    { q: "Traffic to Cosmos DB must stay off the public internet. What do you use?",
-      o: ["A private endpoint", "A bigger firewall rule list", "A longer connection string", "A public IP on the app"],
-      e: "A private endpoint gives the service a private IP address inside your virtual network." },
-    { q: "Secrets are rotated regularly, and your app should pick up the new value without a redeploy. What is a good approach?",
-      o: ["Read the secret from Key Vault at runtime, using a reference without a pinned version", "Copy the secret into the app code", "Email the new secret to the team", "Store it in a container image layer"],
-      e: "Reading from Key Vault (or referencing the latest version) means rotation doesn't need a code change." },
-    M("Which <b>two</b> are benefits of managed identities?",
-      ["No credentials to store in code or config", "Azure handles the credential rotation for you", "They work outside Azure with no extra setup", "They automatically get Owner access"], [0, 1],
-      "Azure creates and rotates the credentials, so you never see or store them. You still assign roles yourself."),
-    O("Give an app keyless access to a Key Vault secret. Put the steps in order.",
-      ["Turn on a managed identity for the app", "Assign the identity the Key Vault Secrets User role", "Use <code>DefaultAzureCredential</code> in the code", "Read the secret at runtime"],
-      "The identity must exist before it can get a role, and the code only works once the access is in place."),
-    P("Match each need with the right tool.",
-      [["Sign in to Azure services without a stored key", "Managed identity"], ["Store and rotate secrets", "Azure Key Vault"], ["Reach a database over a private IP address", "Private endpoint"]], ["Event Grid"],
-      "Identity, secrets and network access each have their own tool.")
-  ] },
-  { id: "mon", title: "Monitoring and troubleshooting", blurb: "Tracing, KQL, alerts and sampling.", qs: [
-    { q: "You want to follow one request as it passes through several services. What do you use?",
-      o: ["Distributed tracing with OpenTelemetry sent to Application Insights", "Only CPU graphs", "A separate spreadsheet", "Restarting each service"],
-      e: "Distributed tracing links the steps of a request using a shared operation ID, so you can see where time or errors occur." },
-    { q: "In a KQL query, which pattern counts failed requests per hour?",
-      o: ["<code>summarize count() by bin(timestamp, 1h)</code>", "<code>project count(1h)</code>", "<code>take 1h</code>", "<code>extend hour = failed</code>"],
-      e: "<code>summarize</code> groups rows, and <code>bin()</code> rounds timestamps into buckets such as one hour." },
-    { q: "The on-call engineer should be notified when failures pass a threshold. What do you create?",
-      o: ["An Azure Monitor alert rule with an action group", "A dashboard tile", "A workbook", "A diagnostic setting only"],
-      e: "Alert rules watch a condition, and action groups say who to notify and how." },
-    { q: "Telemetry costs are high, but you still want a representative picture. What helps?",
-      o: ["Sampling", "Turning off all logging", "Deleting the workspace", "Logging every request twice"],
-      e: "Sampling keeps a percentage of telemetry so costs fall while trends stay accurate." },
-    M("A failing request is slow. Which <b>two</b> tools help you find the dependency that is the problem?",
-      ["The Application Map in Application Insights", "The end-to-end transaction view", "Cost analysis", "Azure Policy compliance"], [0, 1],
-      "Both show how a request flows through your services and where time is spent or failures occur."),
-    O("Investigate a spike in failures. Put the steps in order.",
-      ["Confirm the alert fired and note the time range", "Run a KQL query to find which operation is failing", "Open an end-to-end trace for a failed request", "Fix the cause and watch the metrics return to normal"],
-      "Confirm the problem, narrow it down, look at one failing example in detail, then fix it and verify."),
-    P("Match each task with the tool.",
-      [["Ask questions about your logs", "KQL query"], ["Get notified when a metric crosses a limit", "Alert rule"], ["See how services call each other", "Application Map"]], ["Azure Policy"],
-      "Queries answer questions, alerts tell you something happened, and the map shows relationships.")
-  ] }
+  { id: "sec", title: "Securing Azure solutions", blurb: "Managed identities, Key Vault, RBAC, private networking.", qs: [] },
+  { id: "mon", title: "Monitoring and troubleshooting", blurb: "Tracing, KQL, alerts and sampling.", qs: [] }
 ] }
 ];
 
 /* ---------- setup ---------- */
+const CASES = window.PRIVATE_CASES || {};
 const TOPICS = {}, ALL = [];
-DOMAINS.forEach(d => d.topics.forEach(t => {
-  TOPICS[t.id] = t;
-  t.qs.forEach((q, i) => { q.type = q.type || "single"; q.id = t.id + "-" + (i + 1); q.topic = t.id; ALL.push(q); });
-}));
+DOMAINS.forEach(d => d.topics.forEach(t => { TOPICS[t.id] = t; t.qs.forEach(q => { q.src = q.src || "original"; }); }));
+(window.PRIVATE_QUESTIONS || []).forEach(q => { if (TOPICS[q.topic]) TOPICS[q.topic].qs.push(q); });
+DOMAINS.forEach(d => d.topics.forEach(t => t.qs.forEach(q => { q.type = q.type || "single"; q.topic = t.id; ALL.push(q); })));
 const QBYID = Object.fromEntries(ALL.map(q => [q.id, q]));
-const EXAM_SIZE = Math.min(40, ALL.length), EXAM_MINUTES = 60, PASS = 70;
+const HAS_IMPORTED = false; /* single question bank */
+/* Official domain weights (midpoints). "Using Azure services" is an estimate. */
+const DOMAIN_WEIGHT = { "Containers": 22.5, "Data for AI": 27.5, "Using Azure services": 25, "Security and monitoring": 22.5 };
+const PASS = 70;
 
-let store = { best: {}, missed: [], bestExam: null };
+let store = { last: {}, missed: [], bestExam: null, bank: "all" };
 try { const raw = localStorage.getItem("ai200-practice-v2"); if (raw) store = Object.assign(store, JSON.parse(raw)); } catch (e) {}
+if (!store.last) store.last = {};
+store.bank = "all";
+function inBank(q) { return store.bank === "all" || q.src === store.bank; }
+function bankQs() { return ALL.filter(inBank); }
+function topicQs(t) { return t.qs.filter(inBank); }
+function examSize() { return Math.min(50, bankQs().length); }
+function examMinutes() { return examSize() * 2; }
+function topicStat(t) { const qs = topicQs(t); return { n: qs.length, c: qs.filter(q => store.last[q.id] === true).length, seen: qs.filter(q => q.id in store.last).length }; }
 function save() { try { localStorage.setItem("ai200-practice-v2", JSON.stringify(store)); } catch (e) {} }
 
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -465,18 +272,20 @@ function clearTimer() { if (timerId) { clearInterval(timerId); timerId = null; }
 
 /* ---------- run engine ---------- */
 function makeView(q) {
-  if (q.type === "single" || q.type === "multi") return { perm: shuffle(q.o.map((_, i) => i)) };
-  if (q.type === "order") return { chips: shuffle(q.items.map((_, i) => i)) };
+  if (q.type === "single" || q.type === "multi") return { perm: q.fixed ? q.o.map((_, i) => i) : shuffle(q.o.map((_, i) => i)) };
+  if (q.type === "order") return { chips: shuffle(q.items.concat(q.extra || []).map((_, i) => i)) };
+  if (q.type === "select") return {};
   return { chips: shuffle(q.pairs.map(p => p[1]).concat(q.extra || [])) };
 }
 function initAns(q, v) {
   if (q.type === "single") return null;
   if (q.type === "multi") return [];
   if (q.type === "order") return q.items.map(() => null);
+  if (q.type === "select") return q.slots.map(() => null);
   return q.pairs.map(() => null);
 }
 function newRun(o) {
-  const r = Object.assign({ i: 0, ans: [], view: [], checked: [], touched: [], flags: [], results: [], sel: null, drag: null, screen: "q", confirming: false, focusId: null }, o);
+  const r = Object.assign({ i: 0, ans: [], view: [], checked: [], touched: [], flags: [], results: [], pts: [], sel: null, drag: null, screen: "q", confirming: false, focusId: null }, o);
   r.qs = o.ids.map(id => QBYID[id]);
   r.qs.forEach((q, i) => { r.view[i] = makeView(q); r.ans[i] = initAns(q, r.view[i]); r.checked[i] = false; r.touched[i] = false; });
   return r;
@@ -488,19 +297,23 @@ function isAnswered(i) {
   if (q.type === "order") return a.some(x => x !== null);
   return a.some(x => x !== null);
 }
-function grade(i) {
+function points(i) {
   const q = run.qs[i], a = run.ans[i], v = run.view[i];
-  if (q.type === "single") return a !== null && v.perm[a] === 0;
-  if (q.type === "multi") { const s = a.map(k => v.perm[k]).sort().join(","); return s === q.c.slice().sort().join(","); }
-  if (q.type === "order") return q.items.every((_, p) => a[p] !== null && v.chips[a[p]] === p);
-  return q.pairs.every((p, k) => a[k] !== null && v.chips[a[k]] === p[1]);
+  if (q.type === "single") return { p: a !== null && v.perm[a] === (q.a || 0) ? 1 : 0, m: 1 };
+  if (q.type === "multi") { const sel = a.map(k => v.perm[k]), good = sel.filter(x => q.c.includes(x)).length; return { p: Math.max(0, good - (sel.length - good)), m: q.c.length }; }
+  if (q.type === "order") return { p: q.items.filter((_, k) => a[k] !== null && v.chips[a[k]] === k).length, m: q.items.length };
+  if (q.type === "select") return { p: q.slots.filter((sl, k) => a[k] === sl.a).length, m: q.slots.length };
+  return { p: q.pairs.filter((pr, k) => a[k] !== null && v.chips[a[k]] === pr[1]).length, m: q.pairs.length };
 }
+function grade(i) { const g = points(i); return g.p === g.m; }
 function answerText(q) {
-  if (q.type === "single") return "<p>" + q.o[0] + "</p>";
+  if (q.type === "single") return "<p>" + q.o[q.a || 0] + "</p>";
   if (q.type === "multi") return "<ul>" + q.c.map(k => "<li>" + q.o[k] + "</li>").join("") + "</ul>";
   if (q.type === "order") return "<ol>" + q.items.map(t => "<li>" + t + "</li>").join("") + "</ol>";
+  if (q.type === "select") return "<ul>" + q.slots.map(sl => "<li>" + sl.l + " → <b>" + sl.a + "</b></li>").join("") + "</ul>";
   return "<ul>" + q.pairs.map(p => "<li>" + p[0] + " → " + p[1] + "</li>").join("") + "</ul>";
 }
+function recordResult(q, ok) { store.last[q.id] = ok; recordMissed(q, ok); }
 function recordMissed(q, ok) {
   if (ok) store.missed = store.missed.filter(id => id !== q.id);
   else if (!store.missed.includes(q.id)) store.missed.push(q.id);
@@ -518,32 +331,35 @@ function mount(html, scroll) {
 }
 
 const ACC = ["#0078d4", "#5c2d91", "#008272", "#c43e00"];
-const FICON = { single: "◉", multi: "☑", order: "⇅", match: "⇄" };
-function domainPct(d) { let b = 0, n = 0; d.topics.forEach(t => { n += t.qs.length; b += store.best[t.id] || 0; }); return n ? Math.round(b / n * 100) : 0; }
+const FICON = { single: "◉", multi: "☑", order: "⇅", match: "⇄", select: "▾" };
+function domainPct(d) { let b = 0, n = 0; d.topics.forEach(t => { const st = topicStat(t); n += st.n; b += st.c; }); return n ? Math.round(b / n * 100) : 0; }
 
 function home() {
   clearTimer(); run = null;
+  if (!ALL.length) { mount(`<div class="card"><h2>No questions loaded</h2><p class="muted" style="margin-top:8px">Put <code>private-questions.js</code> in the same folder as <code>index.html</code>, then reload the page.</p></div>`, true); return; }
   const missed = store.missed.filter(id => QBYID[id]);
-  const tot = DOMAINS.reduce((a, d) => { d.topics.forEach(t => { a.n += t.qs.length; a.b += store.best[t.id] || 0; }); return a; }, { n: 0, b: 0 });
-  const overall = Math.round(tot.b / tot.n * 100);
+  const tot = DOMAINS.reduce((a, d) => { d.topics.forEach(t => { const st = topicStat(t); a.n += st.n; a.b += st.c; }); return a; }, { n: 0, b: 0 });
+  const overall = tot.n ? Math.round(tot.b / tot.n * 100) : 0;
+  const cnt = k => ALL.filter(q => k === "all" || q.src === k).length;
+  const bank = HAS_IMPORTED ? `<div class="bank" role="group" aria-label="Question bank"><span>Question bank:</span>${[["all", "All"], ["original", "Original"], ["imported", "Imported"]].map(([k, l]) => `<button data-bank="${k}" aria-pressed="${store.bank === k}">${l} (${cnt(k)})</button>`).join("")}</div>` : "";
   let html = `
     <section class="hero2">
       <div class="hl">
         <h1>AI-200: Developing AI Cloud Solutions on Azure</h1>
-        <p class="lead">Practise for the Azure AI Cloud Developer Associate exam with original questions. Sit a timed practice exam, or work through one topic at a time.</p>
-        <ul class="facts"><li><b>${EXAM_SIZE}</b>questions</li><li><b>${EXAM_MINUTES}</b>minutes</li><li><b>${PASS}%</b>to pass</li><li><b>4</b>question formats</li></ul>
-        <div class="actions"><button class="btn" data-act="exam">Start the full practice exam</button><button class="btn ghost" data-act="topics">Browse topics</button></div>
+        <p class="lead">Practise for the Azure AI Cloud Developer Associate exam. Sit a timed practice exam, or work through one topic at a time.</p>
+        <ul class="facts"><li><b>${examSize()}</b>questions</li><li><b>${examMinutes()}</b>minutes</li><li><b>${PASS}%</b>to pass</li><li><b>${Object.keys(FORMATS).length}</b>question formats</li></ul>
+        <div class="actions"><button class="btn" data-act="exam">Start the full practice exam</button><button class="btn ghost" data-act="topics">Browse topics</button></div>${bank}
       </div>
       <div class="ready">
         <div class="ringrow"><div class="ring" style="--p:${overall}"><span>${overall}%</span></div>
-          <div><h2>Your progress</h2><p class="small">Based on your best score in each topic.${store.bestExam != null ? " Best full exam: " + store.bestExam + "%." : " Take the full exam for a realistic check."}</p></div></div>
+          <div><h2>Your progress</h2><p class="small">Share of questions you got right the last time you answered them, in practice or in an exam.${store.bestExam != null ? " Best full exam: " + store.bestExam + "%." : ""}</p></div></div>
         <div>${DOMAINS.map((d, i) => `<div class="drow"><span>${d.name}</span><span>${domainPct(d)}%</span></div><div class="mini" style="--acc:${ACC[i]}"><i style="width:${domainPct(d)}%"></i></div>`).join("")}</div>
       </div>
     </section>
     <section class="domain"><div class="domain-head"><h2>Practice by question format</h2></div>
       <p class="domain-note">Drill one format. You see feedback after every question.</p><div class="grid">`;
   Object.keys(FORMATS).forEach(f => {
-    const n = ALL.filter(q => q.type === f).length;
+    const n = bankQs().filter(q => q.type === f).length;
     html += `<button class="topic fmt" data-fmt="${f}"><span class="ico" aria-hidden="true">${FICON[f]}</span><strong>${FORMATS[f].name}</strong><span class="blurb">${FORMATS[f].blurb}</span><span class="meta">${n} questions</span></button>`;
   });
   html += `</div><div class="actions"><button class="btn ghost" data-act="mixed">Mixed quiz (20 questions)</button><button class="btn ghost" data-act="review" ${missed.length ? "" : "disabled"}>Review missed (${missed.length})</button></div></section>`;
@@ -551,8 +367,9 @@ function home() {
   DOMAINS.forEach((d, di) => {
     html += `<section class="domain" style="margin-top:22px;--acc:${ACC[di]}"><div class="domain-head"><h2>${d.name}</h2><span class="weight">${d.weight}</span></div><p class="domain-note">${d.note}</p><div class="grid">`;
     d.topics.forEach(t => {
-      const n = t.qs.length, b = store.best[t.id], pct = b == null ? 0 : Math.round(b / n * 100);
-      html += `<button class="topic" data-topic="${t.id}"><strong>${t.title}</strong><span class="blurb">${t.blurb}</span><div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="meta">${b == null ? n + " questions" : "Best: " + b + " of " + n}</span></button>`;
+      const st = topicStat(t), pct = st.n ? Math.round(st.c / st.n * 100) : 0;
+      if (!st.n) return;
+      html += `<button class="topic" data-topic="${t.id}"><strong>${t.title}</strong><span class="blurb">${t.blurb}</span><div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="meta">${st.seen ? st.c + " of " + st.n + " right" : st.n + " questions"}</span></button>`;
     });
     html += `</div></section>`;
   });
@@ -567,7 +384,7 @@ function qBody(i) {
       const s = multi ? a.includes(k) : k === a;
       let cls = "opt", tag = "";
       if (done) {
-        const isC = multi ? q.c.includes(orig) : orig === 0;
+        const isC = multi ? q.c.includes(orig) : orig === (q.a || 0);
         if (isC && (s || !multi)) { cls += " correct"; tag = "✓ Correct"; }
         else if (isC) { cls += " missed"; tag = "Should be selected"; }
         else if (s) { cls += " wrong"; tag = multi ? "✗ Not this one" : "✗ Not quite"; }
@@ -576,10 +393,17 @@ function qBody(i) {
       return `<button class="${cls}" data-k="${k}" data-fid="o${k}" aria-pressed="${s}" ${done ? "disabled" : ""}>${ind}<span class="ltr">${"ABCDEF"[k]}.</span><span class="otx">${q.o[orig]}</span><span class="tag">${tag}</span></button>`;
     }).join("") + `</div>`;
   }
+  if (q.type === "select") {
+    return `<div class="sel-rows">` + q.slots.map((sl, k) => {
+      const ok = a[k] === sl.a, cls = done ? (ok ? " correct" : " wrong") : "";
+      return `<div class="sel-row${cls}"><span>${sl.l}</span><select data-sel="${k}" data-fid="sel${k}" aria-label="${sl.l.replace(/<[^>]+>/g, "").replace(/"/g, "&quot;")}" ${done ? "disabled" : ""}><option value="">Select…</option>${sl.c.map((c, j) => `<option value="${j}" ${a[k] === c ? "selected" : ""}>${c}</option>`).join("")}</select>${done && !ok ? `<span class="fix">Correct: ${sl.a}</span>` : ""}</div>`;
+    }).join("") + `</div>`;
+  }
   /* order and match share one layout: answers on the left, answer area on the right */
   const isOrder = q.type === "order";
   const left = k => isOrder ? "Step " + (k + 1) : q.pairs[k][0];
-  const text = j => isOrder ? q.items[v.chips[j]] : v.chips[j];
+  const pool = isOrder ? q.items.concat(q.extra || []) : null;
+  const text = j => isOrder ? pool[v.chips[j]] : v.chips[j];
   const right = (k, c) => c !== null && (isOrder ? v.chips[c] === k : v.chips[c] === q.pairs[k][1]);
   const used = new Set(a.filter(x => x !== null));
   const rows = a.map((c, k) => {
@@ -590,11 +414,13 @@ function qBody(i) {
   const hint = done ? "Here is how your answers compare."
     : isOrder ? "Drag each step from the left into the answer area on the right, with the first step at the top. On a phone, tap a step, then tap a slot. Tap a filled slot to take it back."
     : "Drag each answer from the left onto its matching item on the right. On a phone, tap an answer, then tap a slot. Tap a filled slot to take it back.";
-  const pool = done ? "" : `<div class="ddcol"><h3>${isOrder ? "Steps" : "Answers"}</h3><div class="pool" data-pool="1">` +
+  const poolHtml = done ? "" : `<div class="ddcol"><h3>${isOrder ? "Steps" : "Answers"}</h3><div class="pool" data-pool="1">` +
     v.chips.map((_, j) => used.has(j) ? "" : `<button class="chip${r.sel === j ? " picked" : ""}" data-chip="${j}" data-fid="c${j}" draggable="true">${text(j)}</button>`).join("") + `</div></div>`;
-  return `<p class="hint">${hint}</p><div class="dd${done ? " one" : ""}">${pool}<div class="ddcol"><h3>Answer area</h3>${rows}</div></div>`;
+  return `<p class="hint">${hint}</p><div class="dd${done ? " one" : ""}">${poolHtml}<div class="ddcol"><h3>Answer area</h3>${rows}</div></div>`;
 }
 
+function codeBox(q) { return q.code ? `<pre class="code">${q.code}</pre>` : ""; }
+function caseBox(q) { const c = q.case && CASES[q.case]; return c ? `<details class="case"><summary>${c.title}</summary>${c.html}</details>` : ""; }
 function pillLabel(q) { return q.type === "multi" ? "Choose " + q.c.length : FORMATS[q.type].name; }
 
 function renderQuestion(scroll) {
@@ -607,7 +433,7 @@ function renderQuestion(scroll) {
     const answered = r.qs.filter((_, k) => isAnswered(k)).length;
     html += `<button class="back" data-act="home">← Leave exam</button>
       <div class="xbar"><div class="xt">AI-200: Developing AI Cloud Solutions on Azure<small>Practice exam</small></div><div class="xq">Question ${i + 1} of ${n}</div><div class="xtime">Time remaining <span class="timer" id="timer" role="timer">${fmtTime(r.endAt - Date.now())}</span></div></div>
-      <div class="xlayout"><div class="xmain"><div class="card"><div class="cardtop"><span class="pill">${pillLabel(q)}</span><button class="flagbtn${flagged ? " on" : ""}" data-act="flag" data-fid="flag" aria-pressed="${flagged}">⚑ ${flagged ? "Marked for review" : "Mark for review"}</button></div><p class="qtext" id="qtext">${q.q}</p>${qBody(i)}</div>
+      <div class="xlayout"><div class="xmain"><div class="card"><div class="cardtop"><span class="pill">${pillLabel(q)}</span><button class="flagbtn${flagged ? " on" : ""}" data-act="flag" data-fid="flag" aria-pressed="${flagged}">⚑ ${flagged ? "Marked for review" : "Mark for review"}</button></div>${caseBox(q)}<p class="qtext" id="qtext">${q.q}</p>${codeBox(q)}${qBody(i)}</div>
       <div class="examnav"><div><button class="btn ghost" data-act="prev" ${i === 0 ? "disabled" : ""}>Previous</button><button class="btn" data-act="next" ${i === n - 1 ? "disabled" : ""}>Next</button></div><button class="btn ghost" data-act="finish">Finish exam</button></div>`;
     if (r.confirming) {
       const un = n - answered, fl = r.flags.filter(Boolean).length;
@@ -620,10 +446,10 @@ function renderQuestion(scroll) {
     html += `<button class="back" data-act="home">← All topics</button>
       <div class="qhead"><span class="qtitle">${r.title}</span><span>Question ${i + 1} of ${n}</span></div>
       <div class="bar" aria-hidden="true" style="margin-top:8px"><i style="width:${Math.round(i / n * 100)}%"></i></div>
-      <div class="card"><span class="pill">${pillLabel(q)}</span><p class="qtext" id="qtext">${q.q}</p>${qBody(i)}`;
+      <div class="card"><span class="pill">${pillLabel(q)}</span>${caseBox(q)}<p class="qtext" id="qtext">${q.q}</p>${codeBox(q)}${qBody(i)}`;
     if (done) {
-      const ok = r.results[i], last = i === n - 1;
-      html += `<div class="explain ${ok ? "good" : "bad"}" role="status"><b>${ok ? "Nice work!" : "Good to know:"}</b>${q.e}${!ok && (q.type === "order" || q.type === "match") ? `<div class="ans"><b>Correct answer</b>${answerText(q)}</div>` : ""}</div>
+      const ok = r.results[i], g = r.pts[i] || { p: 0, m: 1 }, last = i === n - 1;
+      html += `<div class="explain ${ok ? "good" : "bad"}" role="status"><b>${ok ? "Nice work!" : g.p ? "Partly right: " + g.p + " of " + g.m + " points." : "Good to know:"}</b>${q.e}${!ok && (q.type === "order" || q.type === "match" || q.type === "select" || (q.type === "multi" && g.p)) ? `<div class="ans"><b>Correct answer</b>${answerText(q)}</div>` : ""}</div>
         <div class="next"><button class="btn" data-act="next" data-fid="next">${last ? "See my score" : "Next question"}</button></div>`;
     } else if (q.type !== "single") {
       const ready = q.type === "multi" ? r.ans[i].length > 0 : r.ans[i].every(x => x !== null);
@@ -643,17 +469,27 @@ function startPractice(title, ids, kind, topicId) {
   renderQuestion(true);
 }
 function pickExam(n) {
-  const pools = Object.values(TOPICS).map(t => shuffle(t.qs)), out = [];
-  for (let k = 0; out.length < n; k++) {
-    let added = false;
-    for (const p of shuffle(pools)) { if (k < p.length && out.length < n) { out.push(p[k]); added = true; } }
-    if (!added) break;
-  }
+  /* Split questions across domains by the official weights, then rotate through each domain's topics. */
+  const ds = DOMAINS.map(d => ({ w: DOMAIN_WEIGHT[d.name] || 25, pools: d.topics.map(t => shuffle(topicQs(t))).filter(p => p.length) })).filter(x => x.pools.length);
+  const total = ds.reduce((a, x) => a + x.w, 0);
+  ds.forEach(x => { x.avail = x.pools.reduce((a, p) => a + p.length, 0); x.quota = Math.min(x.avail, Math.round(n * x.w / total)); });
+  let diff = n - ds.reduce((a, x) => a + x.quota, 0);
+  while (diff > 0) { const c = ds.filter(x => x.quota < x.avail).sort((a, b) => a.quota / a.w - b.quota / b.w)[0]; if (!c) break; c.quota++; diff--; }
+  while (diff < 0) { const c = ds.filter(x => x.quota > 0).sort((a, b) => b.quota / b.w - a.quota / a.w)[0]; c.quota--; diff++; }
+  const out = [];
+  ds.forEach(x => {
+    let taken = 0;
+    for (let k = 0; taken < x.quota; k++) {
+      let added = false;
+      for (const p of shuffle(x.pools)) { if (k < p.length && taken < x.quota) { out.push(p[k]); taken++; added = true; } }
+      if (!added) break;
+    }
+  });
   return shuffle(out).map(q => q.id);
 }
 function startExam() {
   clearTimer();
-  run = newRun({ mode: "exam", title: "Full practice exam", kind: "exam", ids: pickExam(EXAM_SIZE), endAt: Date.now() + EXAM_MINUTES * 60000 });
+  run = newRun({ mode: "exam", title: "Full practice exam", kind: "exam", ids: pickExam(examSize()), endAt: Date.now() + examMinutes() * 60000 });
   timerId = setInterval(() => {
     if (!run || run.mode !== "exam" || run.screen !== "q") return;
     const left = run.endAt - Date.now(), el = document.getElementById("timer");
@@ -666,8 +502,7 @@ function startExam() {
 /* ---------- finishing ---------- */
 function finishPractice() {
   const r = run, n = r.qs.length, score = r.results.filter(Boolean).length;
-  if (r.kind === "topic" && (store.best[r.topicId] == null || store.best[r.topicId] < score)) { store.best[r.topicId] = score; save(); }
-  const wrong = r.qs.filter((_, i) => !r.results[i]).map(q => q.id);
+    const wrong = r.qs.filter((_, i) => !r.results[i]).map(q => q.id);
   const pct = Math.round(score / n * 100);
   const msg = pct === 100 ? "Perfect round. Great job!" : pct >= 70 ? "Solid work. A little more practice and you're there." : pct >= 40 ? "A good start. Read the explanations and try again." : "Everyone starts somewhere. Review the explanations and give it another go.";
   r.screen = "result"; r.wrongIds = wrong;
@@ -678,8 +513,10 @@ function finishPractice() {
 function finishExam() {
   clearTimer();
   const r = run; if (r.screen !== "q") return;
-  r.qs.forEach((q, i) => { r.results[i] = isAnswered(i) && grade(i); recordMissed(q, r.results[i]); });
-  const n = r.qs.length, score = r.results.filter(Boolean).length, pct = Math.round(score / n * 100);
+  r.qs.forEach((q, i) => { r.pts[i] = isAnswered(i) ? points(i) : { p: 0, m: points(i).m }; r.results[i] = r.pts[i].p === r.pts[i].m; recordResult(q, r.results[i]); });
+  const n = r.qs.length, score = r.results.filter(Boolean).length;
+  const tp = r.pts.reduce((a, g) => a + g.p, 0), tm = r.pts.reduce((a, g) => a + g.m, 0), pct = Math.round(tp / tm * 100);
+  r.tp = tp; r.tm = tm;
   if (store.bestExam == null || store.bestExam < pct) store.bestExam = pct;
   save();
   r.score = score; r.pct = pct; r.screen = "result";
@@ -688,11 +525,11 @@ function finishExam() {
 function renderExamResult() {
   const r = run, n = r.qs.length, pass = r.pct >= PASS;
   const by = {};
-  r.qs.forEach((q, i) => { by[q.topic] = by[q.topic] || { t: 0, c: 0 }; by[q.topic].t++; if (r.results[i]) by[q.topic].c++; });
-  const rows = Object.keys(by).map(id => { const b = by[id], p = Math.round(b.c / b.t * 100); return `<div class="brow"><span>${TOPICS[id].title}</span><span>${b.c} of ${b.t}</span></div><div class="bar" aria-hidden="true"><i style="width:${p}%"></i></div>`; }).join("");
+  r.qs.forEach((q, i) => { by[q.topic] = by[q.topic] || { t: 0, c: 0 }; by[q.topic].t += r.pts[i].m; by[q.topic].c += r.pts[i].p; });
+  const rows = Object.keys(by).map(id => { const b = by[id], p = Math.round(b.c / b.t * 100); return `<div class="brow"><span>${TOPICS[id].title}</span><span>${b.c} of ${b.t} points</span></div><div class="bar" aria-hidden="true"><i style="width:${p}%"></i></div>`; }).join("");
   mount(`<div class="card result"><p class="lead" style="margin:0 auto">${r.title}</p><div class="score">${r.pct}%</div>
     <span class="verdict ${pass ? "pass" : "fail"}">${pass ? "You passed" : "Not yet"} · pass mark ${PASS}%</span>
-    <p>${r.score} of ${n} correct. ${pass ? "Nice work." : "Review the ones you missed and try again."}</p>
+    <p>${r.score} of ${n} questions fully correct, ${r.tp} of ${r.tm} points. ${pass ? "Nice work." : "Review the ones you missed and try again."}</p>
     <div class="brk"><h2>How you did by topic</h2>${rows}</div>
     <div class="actions"><button class="btn" data-act="review-exam">Review my answers</button><button class="btn ghost" data-act="exam">Take another exam</button><button class="btn ghost" data-act="home">Back to the start</button></div></div>`, true);
 }
@@ -704,7 +541,7 @@ function renderReview(onlyWrong) {
   if (!items.length) html += `<div class="card"><p>You got every question right. Nothing to review!</p></div>`;
   items.forEach(({ q, i }) => {
     const ok = r.results[i];
-    html += `<div class="card rv"><p class="rvhead ${ok ? "ok" : "no"}">${ok ? "✓ Correct" : (isAnswered(i) ? "✗ Not quite" : "✗ Not answered")} · Question ${i + 1} · ${pillLabel(q)}</p><p class="qtext">${q.q}</p><div class="ans" style="border:0;padding:0;margin:0"><b>Correct answer</b>${answerText(q)}</div><div class="explain"><b>Why</b>${q.e}</div></div>`;
+    html += `<div class="card rv"><p class="rvhead ${ok ? "ok" : "no"}">${ok ? "✓ Correct" : !isAnswered(i) ? "✗ Not answered" : r.pts[i].p ? "◐ Partly right (" + r.pts[i].p + " of " + r.pts[i].m + ")" : "✗ Not quite"} · Question ${i + 1} · ${pillLabel(q)}</p>${caseBox(q)}<p class="qtext">${q.q}</p>${codeBox(q)}<div class="ans" style="border:0;padding:0;margin:0"><b>Correct answer</b>${answerText(q)}</div><div class="explain"><b>Why</b>${q.e}</div></div>`;
   });
   mount(html, true);
 }
@@ -719,8 +556,8 @@ function choose(k) {
 }
 function check() {
   const r = run, i = r.i, q = r.qs[i];
-  r.checked[i] = true; r.results[i] = grade(i);
-  recordMissed(q, r.results[i]); save();
+  r.checked[i] = true; r.pts[i] = points(i); r.results[i] = r.pts[i].p === r.pts[i].m;
+  recordResult(q, r.results[i]); save();
   r.focusId = "next"; renderQuestion();
 }
 function moveItem(from, to, focusId) {
@@ -738,11 +575,12 @@ function unassign(j) { const r = run, a = r.ans[r.i]; a.forEach((x, idx) => { if
 function goTo(k) { run.i = k; run.sel = null; run.confirming = false; renderQuestion(true); }
 
 app.addEventListener("click", e => {
-  const t = e.target.closest("[data-topic],[data-fmt],[data-act],[data-k],[data-slot],[data-chip],[data-nav]");
+  const t = e.target.closest("[data-topic],[data-fmt],[data-act],[data-k],[data-slot],[data-chip],[data-nav],[data-bank]");
   if (!t) return;
   const d = t.dataset;
-  if (d.topic) { const tp = TOPICS[d.topic]; return startPractice(tp.title, shuffle(tp.qs.map(q => q.id)), "topic", tp.id); }
-  if (d.fmt) return startPractice(FORMATS[d.fmt].name, shuffle(ALL.filter(q => q.type === d.fmt).map(q => q.id)).slice(0, 15), "format");
+  if (d.bank) { store.bank = d.bank; save(); return home(); }
+  if (d.topic) { const tp = TOPICS[d.topic]; return startPractice(tp.title, shuffle(topicQs(tp).map(q => q.id)), "topic", tp.id); }
+  if (d.fmt) return startPractice(FORMATS[d.fmt].name, shuffle(bankQs().filter(q => q.type === d.fmt).map(q => q.id)).slice(0, 15), "format");
   if (d.k !== undefined) return choose(+d.k);
   if (d.nav !== undefined) return goTo(+d.nav);
   if (d.chip !== undefined) { run.sel = run.sel === +d.chip ? null : +d.chip; run.focusId = "c" + d.chip; return renderQuestion(); }
@@ -768,10 +606,18 @@ app.addEventListener("click", e => {
   else if (act === "exam-result") renderExamResult();
   else if (act === "review-exam") renderReview(false);
   else if (act === "review-wrong") renderReview(true);
-  else if (act === "mixed") startPractice("Mixed quiz", shuffle(ALL.map(q => q.id)).slice(0, 20), "mixed");
+  else if (act === "mixed") startPractice("Mixed quiz", shuffle(bankQs().map(q => q.id)).slice(0, 20), "mixed");
   else if (act === "review") startPractice("Missed questions", shuffle(store.missed.filter(id => QBYID[id])), "review");
   else if (act === "retrywrong") startPractice("Retry: missed questions", shuffle(run.wrongIds), "review");
   else if (act === "again") { const r = run; startPractice(r.title, shuffle(r.qs.map(q => q.id)), r.kind, r.topicId); }
+});
+
+app.addEventListener("change", e => {
+  const el = e.target.closest("[data-sel]");
+  if (!el || !run || run.screen !== "q") return;
+  const q = run.qs[run.i], k = +el.dataset.sel;
+  run.ans[run.i][k] = el.value === "" ? null : q.slots[k].c[+el.value];
+  run.touched[run.i] = true; run.focusId = "sel" + k; renderQuestion();
 });
 
 /* drag and drop (mouse); tap and arrow buttons cover touch and keyboard */

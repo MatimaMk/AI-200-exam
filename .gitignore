@@ -1,2 +1,5 @@
 .DS_Store
 node_modules/
+
+# Imported practice questions. Keep these out of the public repository.
+private-questions.js
