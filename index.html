@@ -244,6 +244,30 @@ details.case ul { padding-left: 20px; margin: 6px 0 0; }
 .brk { text-align: left; max-width: 540px; margin: 22px auto 0; }
 .brow { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; font-size: .92rem; margin-top: 10px; }
 .rv { margin-top: 14px; }
+.pd { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1.3fr); gap: 18px; margin: 4px 0 14px; }
+.pd-sep { background: #8a8886; }
+.pd-h { font-weight: 700; margin-bottom: 8px; }
+.pd-item { border: 1px solid #8a8886; background: #fff; padding: 7px 10px; margin-bottom: 8px; font-size: .93rem; }
+.pd-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+.pd-row.pd-m { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pd-th { font-weight: 600; font-size: .9rem; color: var(--muted); margin-bottom: 4px; }
+.pd-num { font-weight: 700; text-align: right; }
+.pd-req { font-size: .93rem; }
+.pd-slot { min-height: 36px; border: 1px solid #8a8886; background: #fff; padding: 7px 10px; font-size: .93rem; }
+.pd-slot.on { border: 2px solid var(--good); background: var(--good-soft); font-weight: 600; }
+.pd-sel { margin: 4px 0 14px; }
+.pd-sel .pd-row { align-items: start; }
+.pd-dd { border: 1px solid #8a8886; background: #fff; font-size: .93rem; }
+.pd-ddh { display: flex; justify-content: space-between; padding: 4px 8px; background: #f3f2f1; border-bottom: 1px solid #8a8886; min-height: 26px; }
+.pd-opt { padding: 5px 8px; border: 2px solid transparent; }
+.pd-opt.on { border-color: var(--good); background: var(--good-soft); font-weight: 600; }
+.pd-yn { border-collapse: collapse; width: 100%; margin: 4px 0 14px; }
+.pd-yn th { text-align: left; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.pd-yn th:not(:first-child), .pd-c { text-align: center; width: 70px; }
+.pd-yn td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.pd-radio { display: inline-block; width: 16px; height: 16px; border: 1.5px solid #605e5c; border-radius: 50%; vertical-align: middle; }
+.pd-radio.on { border: 2px solid var(--good); outline: 2px solid var(--good); outline-offset: 3px; background: radial-gradient(circle, var(--good) 0 4px, transparent 5px); }
+@media (max-width: 700px) { .pd { grid-template-columns: 1fr; } .pd-sep { display: none; } .pd-row.pd-m { grid-template-columns: 1fr; } }
 .studybar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 14px 0 6px; }
 .studybar label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; font-weight: 600; color: var(--muted); }
 .studybar select, .studybar input[type=search] { font: inherit; font-weight: 400; color: var(--ink); padding: 8px 10px; border: 1px solid #8a8886; border-radius: 2px; background: #fff; min-width: 220px; }
@@ -666,10 +690,30 @@ function studyAnswer(q, hide) {
     const opts = `<ol class="sto">${q.o.map((o, k) => `<li class="${ok(k) && !hide ? "ok" : ""}"><b>${"ABCDEFGH"[k]}.</b>${o}${ok(k) && !hide ? " ✓" : ""}</li>`).join("")}</ol>`;
     return { opts, ans: `<div class="stans"><b>Answer: ${q.o.map((_, k) => ok(k) ? "ABCDEFGH"[k] : "").join("")}</b></div>` };
   }
-  const extra = q.type === "order" && q.extra && q.extra.length ? `<p class="muted" style="margin-top:6px;font-size:.9rem">Not used: ${q.extra.join("; ")}</p>`
-    : q.type === "match" && q.extra && q.extra.length ? `<p class="muted" style="margin-top:6px;font-size:.9rem">Not used: ${q.extra.join("; ")}</p>` : "";
-  const sel = q.type === "select" ? `<ul class="sto" style="list-style:none;padding:0;margin:0 0 12px;display:grid;gap:6px">${q.slots.map(sl => `<li style="border:1px solid var(--line);border-radius:2px;padding:8px 12px">${sl.l} <span class="muted" style="font-size:.88rem">(options: ${sl.c.join(" | ")})</span></li>`).join("")}</ul>` : "";
-  return { opts: sel, ans: `<div class="stans"><b>Answer</b>${answerText(q)}${extra}</div>` };
+  const filled = studyVisual(q, true);
+  if (!hide) return { opts: filled, ans: "" };
+  return { opts: studyVisual(q, false), ans: `<div class="stans"><b>Answer</b></div>${filled}` };
+}
+function stableOrder(arr, seed) {
+  const h = t => { let x = 0; for (const ch of seed + t) x = (x * 31 + ch.charCodeAt(0)) | 0; return x; };
+  return arr.slice().sort((a, b) => h(a) - h(b));
+}
+function studyVisual(q, filled) {
+  if (q.type === "order" || q.type === "match") {
+    const isOrder = q.type === "order";
+    const pool = isOrder ? q.items.concat(q.extra || []) : [...new Set(q.pairs.map(p => p[1]))].concat(q.extra || []);
+    const left = stableOrder(pool, q.id).map(t => `<div class="pd-item">${t}</div>`).join("");
+    const rows = isOrder
+      ? q.items.map((t, k) => `<div class="pd-row"><span class="pd-num">${k + 1}.</span><div class="pd-slot${filled ? " on" : ""}">${filled ? t : ""}</div></div>`).join("")
+      : q.pairs.map(p => `<div class="pd-row pd-m"><span class="pd-req">${p[0]}</span><div class="pd-slot${filled ? " on" : ""}">${filled ? p[1] : ""}</div></div>`).join("");
+    return `<div class="pd"><div class="pd-col"><div class="pd-h">${isOrder ? "Actions" : "Options"}</div>${left}</div><div class="pd-sep"></div><div class="pd-col"><div class="pd-h">Answer area</div>${!isOrder ? `<div class="pd-row pd-m pd-th"><span>Requirement</span><span>Selection</span></div>` : ""}${rows}</div></div>`;
+  }
+  if (q.type === "select") {
+    const yn = q.slots.every(sl => sl.c.join() === "Yes,No");
+    if (yn) return `<table class="pd-yn"><thead><tr><th>Statement</th><th>Yes</th><th>No</th></tr></thead><tbody>${q.slots.map(sl => `<tr><td>${sl.l}</td>${["Yes", "No"].map(c => `<td class="pd-c"><span class="pd-radio${filled && sl.a === c ? " on" : ""}"></span></td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    return `<div class="pd-sel"><div class="pd-row pd-m pd-th"><span>Requirement</span><span>Selection</span></div>${q.slots.map(sl => `<div class="pd-row pd-m"><span class="pd-req">${sl.l}</span><div class="pd-dd"><div class="pd-ddh"><span></span><span aria-hidden="true">▾</span></div>${sl.c.map(c => `<div class="pd-opt${filled && c === sl.a ? " on" : ""}">${c}</div>`).join("")}</div></div>`).join("")}</div>`;
+  }
+  return "";
 }
 function renderStudy() {
   clearTimer(); run = null;
