@@ -136,6 +136,9 @@ pre.code { background: var(--subtle); border: 1px solid var(--line); border-radi
 .sel-row.wrong { border-color: var(--bad); background: var(--bad-soft); }
 .sel-row .fix { grid-column: 1 / -1; font-size: .88rem; color: var(--muted); }
 @media (max-width: 640px) { .sel-row { grid-template-columns: 1fr; } }
+.lenpick { display: flex; flex-direction: column; gap: 4px; margin: 18px 0 0; max-width: 280px; }
+.lenpick label { font-size: .85rem; font-weight: 600; color: var(--muted); }
+.lenpick select { font: inherit; padding: 9px 10px; border: 1px solid #8a8886; border-radius: 2px; background: #fff; color: var(--ink); }
 details.case summary { cursor: pointer; font-weight: 600; }
 details.case p, details.case li { font-size: .93rem; color: var(--muted); margin: 8px 0 0; }
 details.case ul { padding-left: 20px; margin: 6px 0 0; }
@@ -260,7 +263,8 @@ store.bank = "all";
 function inBank(q) { return store.bank === "all" || q.src === store.bank; }
 function bankQs() { return ALL.filter(inBank); }
 function topicQs(t) { return t.qs.filter(inBank); }
-function examSize() { return Math.min(50, bankQs().length); }
+const LENGTHS = [10, 25, 50, 100, 0]; /* 0 = all questions */
+function examSize() { const n = bankQs().length, len = store.examLen == null ? 50 : store.examLen; return len === 0 ? n : Math.min(len, n); }
 function examMinutes() { return examSize() * 2; }
 function topicStat(t) { const qs = topicQs(t); return { n: qs.length, c: qs.filter(q => store.last[q.id] === true).length, seen: qs.filter(q => q.id in store.last).length }; }
 function save() { try { localStorage.setItem("ai200-practice-v2", JSON.stringify(store)); } catch (e) {} }
@@ -348,7 +352,8 @@ function home() {
         <h1>AI-200: Developing AI Cloud Solutions on Azure</h1>
         <p class="lead">Practise for the Azure AI Cloud Developer Associate exam. Sit a timed practice exam, or work through one topic at a time.</p>
         <ul class="facts"><li><b>${examSize()}</b>questions</li><li><b>${examMinutes()}</b>minutes</li><li><b>${PASS}%</b>to pass</li><li><b>${Object.keys(FORMATS).length}</b>question formats</li></ul>
-        <div class="actions"><button class="btn" data-act="exam">Start a random 50-question exam</button><button class="btn ghost" data-act="topics">Browse topics</button></div>${bank}
+        <div class="lenpick"><label for="examLen">Choose length</label><select id="examLen" data-len="1">${LENGTHS.filter(l => l === 0 || l < bankQs().length).map(l => `<option value="${l}" ${(store.examLen == null ? 50 : store.examLen) === l ? "selected" : ""}>${l === 0 ? "All questions (" + bankQs().length + ")" : l + " questions"}</option>`).join("")}</select></div>
+        <div class="actions"><button class="btn" data-act="exam">Start a ${examSize()}-question exam</button><button class="btn ghost" data-act="topics">Browse topics</button></div>${bank}
       </div>
       <div class="ready">
         <div class="ringrow"><div class="ring" style="--p:${overall}"><span>${overall}%</span></div>
@@ -627,6 +632,7 @@ app.addEventListener("click", e => {
 });
 
 app.addEventListener("change", e => {
+  if (e.target.id === "examLen") { store.examLen = +e.target.value; save(); return home(); }
   const el = e.target.closest("[data-sel]");
   if (!el || !run || run.screen !== "q") return;
   const q = run.qs[run.i], k = +el.dataset.sel;
